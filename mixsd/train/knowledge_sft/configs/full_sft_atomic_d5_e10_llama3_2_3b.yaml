@@ -1,0 +1,66 @@
+base_model: meta-llama/Llama-3.2-3B-Instruct
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+datasets:
+  - path: /path/to/mixsd_data/mixsd/data/knowledge_d5_e10/atomic_sft/train_messages.jsonl
+    type: chat_template
+    field_messages: messages
+dataset_prepared_path:
+val_set_size: 0
+chat_template: llama3
+# enable_thinking is a no-op for Llama (template doesn't reference it); kept
+# uniform with Qwen configs so the eval pipeline can pass it unconditionally.
+chat_template_kwargs:
+  enable_thinking: false
+
+test_datasets:
+  - path: /path/to/mixsd_data/mixsd/data/knowledge_d5_e10/atomic_sft/val_paraphrased_messages.jsonl
+    type: chat_template
+
+output_dir: /path/to/mixsd_data/mixsd/checkpoints/knowledge/atomic_full_sft_d5_e10_10ep_llama3_2_3b
+
+sequence_len: 1000
+pad_to_sequence_len: true
+sample_packing: false
+eval_sample_packing: false
+
+micro_batch_size: 1
+gradient_accumulation_steps: 20
+num_epochs: 20
+optimizer: adamw_torch_fused
+lr_scheduler: constant
+learning_rate: 1.0e-4
+weight_decay: 0.01
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_epsilon: 1.0e-8
+max_grad_norm: 1.0
+
+bf16: true
+tf32: true
+
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+logging_steps: 10
+# flash_attn not installed in this axolotl env; axolotl's llama-specific
+# monkeypatch imports flash_attn unconditionally when this is true.
+flash_attention: false
+evals_per_epoch: 2
+save_strategy: steps
+save_steps: 50
+save_total_limit: 20
+load_best_model_at_end: false
+save_only_model: true
+
+wandb_project: knowledge_sft
+wandb_name: full-sft-atomic-d5-e10-llama3-2-3b
+wandb_log_model: "false"
+
+special_tokens:
+  bos_token: "<|begin_of_text|>"
+  eos_token: "<|eot_id|>"
+  pad_token: "<|end_of_text|>"

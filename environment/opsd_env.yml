@@ -1,0 +1,36 @@
+name: opsd
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - torch==2.9.1
+    - torchaudio==2.9.1
+    - torchvision==0.24.1
+    - vllm==0.11.2
+    - xformers==0.0.33.post1
+    - transformers==4.57.1
+    - accelerate==1.13.0
+    - peft==0.18.1
+    - datasets==4.8.4
+    - huggingface_hub==0.36.2
+    - tokenizers
+    - sentencepiece==0.2.1
+    - tiktoken==0.12.0
+    - protobuf==6.33.6
+    - einops==0.8.2
+    - ray==2.54.1
+    - sglang==0.5.9
+    - triton==3.5.1
+    - wandb==0.25.1
+    - tensorboard==2.20.0
+    - numpy==2.2.6
+    - scipy==1.17.1
+    - pandas==2.3.3
+    - pyarrow==23.0.1
+    - scikit-learn==1.8.0
+    - matplotlib==3.10.8
+    - tqdm==4.67.3
+    - ipykernel==7.2.0

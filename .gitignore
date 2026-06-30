@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Cluster / job logs
+*.out
+*.err
+*.o[0-9]*
+*.e[0-9]*
+*.log
+slurm-*.out
+
+# Data, models, checkpoints (regenerated locally, not committed)
+data/
+checkpoints/
+models/*/
+*.json
+*.jsonl
+!mixsd/train/memit/configs/*.json
+
+# Weights & Biases / TensorBoard
+wandb/
+runs/

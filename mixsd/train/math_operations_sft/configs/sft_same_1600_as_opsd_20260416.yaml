@@ -1,0 +1,61 @@
+# Qwen3-4B full-SFT matched 1-to-1 with the OPSD forward-KL GT run (20260414):
+# 100 optimizer steps × global batch 16 = 1,600 training examples,
+# single epoch over the shuffled dataset so nothing repeats. Seed 42 matches
+# the OPSD config so the example ordering is directly comparable.
+
+base_model: /path/to/data/models/Qwen/Qwen3-4B-Instruct-2507
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+datasets:
+  - path: /path/to/mixsd_data/mixsd/data/math_operations/primitive_atomic_balanced_sft_50k/balanced_train_alpaca.jsonl
+    type: alpaca
+dataset_prepared_path:
+val_set_size: 0
+chat_template: chatml
+
+test_datasets:
+  - path: /path/to/mixsd_data/mixsd/data/math_operations/primitive_atomic_balanced_sft_50k/balanced_val_alpaca.jsonl
+    type: alpaca
+
+output_dir: /path/to/mixsd_data/mixsd/checkpoints/math_operations/sft_same_1600_as_opsd_20260416
+
+sequence_len: 2048
+# Packing disabled so 1 dataset row == 1 batch item; keeps the 1,600-example
+# count exact regardless of sequence-length distribution.
+sample_packing: false
+eval_sample_packing: false
+
+# Global batch 16 = num_prompts_per_step from OPSD; 100 steps × 16 = 1,600 rows.
+gradient_accumulation_steps: 16
+micro_batch_size: 1
+max_steps: 100
+num_epochs: 1
+optimizer: adamw_torch_fused
+lr_scheduler: constant_with_warmup
+learning_rate: 1e-4
+seed: 42
+
+bf16: auto
+tf32: true
+
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+logging_steps: 5
+flash_attention: true
+warmup_steps: 20
+eval_steps: 20
+save_steps: 20
+save_total_limit: 3
+load_best_model_at_end: true
+weight_decay: 0.01
+
+wandb_project: math_operations_sft
+wandb_name: sft-same-1600-as-opsd-20260416
+wandb_log_model: "false"
+
+special_tokens:

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mixsd"
+version = "0.1.0"
+description = "MixSD: Mixed Contextual Self-Distillation for Knowledge Injection"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Jiarui Liu", email = "jiaruil5@andrew.cmu.edu" },
+]
+
+# NOTE: Heavy training/inference dependencies (torch, vLLM, transformers,
+# sglang, NeMo-RL, verl, axolotl, flash-attn, ...) are managed through the
+# conda environments in `environment/`. Only the
+# light, import-time dependencies of the data-construction / eval utilities
+# are listed here.
+dependencies = [
+    "numpy",
+    "datasets",
+    "huggingface_hub",
+    "tqdm",
+]
+
+[tool.setuptools]
+packages = ["mixsd"]

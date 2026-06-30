@@ -1,0 +1,64 @@
+# Qwen3-4B full fine-tuning SFT on compositional_sft_n_steps_2 (sequential: after primitive atomic balanced full SFT 50k)
+
+base_model: /path/to/mixsd_data/mixsd/checkpoints/math_operations/primitive_atomic_full_sft_50k_lr1e4_t20260308
+
+# Model loading (full precision, no quantization, no adapter)
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+# Training dataset (5000 examples, compositional 2-step operations)
+datasets:
+  - path: /path/to/mixsd_data/mixsd/data/math_operations/compositional_sft_n_steps_2/train_alpaca.jsonl
+    type: alpaca
+dataset_prepared_path:
+val_set_size: 0
+chat_template: chatml
+
+# Validation dataset (200 examples)
+test_datasets:
+  - path: /path/to/mixsd_data/mixsd/data/math_operations/compositional_sft_n_steps_2/val_alpaca.jsonl
+    type: alpaca
+
+output_dir: /path/to/mixsd_data/mixsd/checkpoints/math_operations/primitive_atomic_full_sft_then_2step_compositional_full_sft_t20260309
+
+# Sequence settings
+sequence_len: 2048
+sample_packing: true
+eval_sample_packing: true
+
+# No adapter — full fine-tuning (all parameters trainable)
+
+# Training hyperparameters
+gradient_accumulation_steps: 8
+micro_batch_size: 1
+num_epochs: 5
+optimizer: adamw_torch_fused
+lr_scheduler: cosine
+learning_rate: 1e-4
+
+# Precision
+bf16: auto
+tf32: true
+
+# Memory optimization
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+# Logging and saving
+logging_steps: 10
+flash_attention: true
+warmup_ratio: 0.1
+evals_per_epoch: 2
+saves_per_epoch: 1
+save_total_limit: 1
+load_best_model_at_end: true
+weight_decay: 0.01
+
+# Wandb logging
+wandb_project: math_operations_sft
+wandb_name: primitive-atomic-full-sft-then-2step-compositional-full-sft-t20260309
+wandb_log_model: "false"
+
+special_tokens:

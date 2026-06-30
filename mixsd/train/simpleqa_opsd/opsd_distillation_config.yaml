@@ -1,0 +1,191 @@
+# OPSD: On-Policy Self-Distillation for SimpleQA
+#
+# Self-distillation: teacher = student (same model, frozen teacher).
+# The student generates on-policy, teacher computes logits, KL loss trains student.
+# Guidance: ground truth answer inserted into teacher's user turn.
+
+paths:
+    base_dir: "/path/to/MixSD/mixsd/train/simpleqa_opsd"
+    data_dir: "/path/to/mixsd_data/mixsd/data/simpleqa/atomic_sft"
+    checkpoint_dir: "/path/to/mixsd_data/mixsd/checkpoints/simpleqa/opsd_nemo_rl"
+    log_dir: "/path/to/mixsd_data/mixsd/checkpoints/simpleqa/opsd_nemo_rl/logs"
+    model_search_dirs:
+        - "/path/to/mixsd_data/models"
+
+distillation:
+    num_prompts_per_step: 16
+    num_generations_per_prompt: 1
+    max_rollout_turns: 1
+    max_num_steps: 1000
+    max_num_epochs: 2
+    val_batch_size: 32
+    val_period: 20
+    val_at_start: true
+    val_at_end: true
+    max_val_samples: 200
+    topk_logits_k: 64
+    ema_decay: 1.0
+    # Who samples rollouts y: "student" = on-policy self-distillation (y ~ π_θ(·|x)),
+    # "teacher" = off-policy self-distillation (y ~ π_θ(·|x, f)).
+    rollout_policy: "student"
+    seed: 42
+
+loss_fn:
+    kl_type: "reverse"
+    mixed_kl_weight: 0.5
+    zero_outside_topk: false
+
+checkpointing:
+    enabled: true
+    checkpoint_dir: ${paths.checkpoint_dir}
+    metric_name: null
+    higher_is_better: true
+    keep_top_k: null
+    save_period: 1000000000
+    save_per_epoch: true
+    checkpoint_must_save_by: null
+    save_consolidated: false
+    save_optimizer: false
+    model_save_format: "safetensors"
+
+policy: &POLICY_BASE
+    model_name: "Qwen/Qwen3-4B-Instruct-2507"
+    tokenizer:
+        name: ${..model_name}
+        chat_template_kwargs:
+            enable_thinking: false
+    train_global_batch_size: 16
+    train_micro_batch_size: 1
+    generation_batch_size: 16
+    logprob_batch_size: 1
+    max_total_sequence_length: 10000
+    precision: "bfloat16"
+    logprob_chunk_size: null
+
+    offload_optimizer_for_logprob: false
+
+    dtensor_cfg: &DTENSOR_BASE
+        enabled: true
+        _v2: true
+        cpu_offload: true
+        sequence_parallel: false
+        activation_checkpointing: true
+        tensor_parallel_size: 4
+        context_parallel_size: 1
+        custom_parallel_plan: null
+
+    dynamic_batching:
+        enabled: true
+        train_mb_tokens: ${mul:${..max_total_sequence_length}, ${..train_micro_batch_size}}
+        logprob_mb_tokens: ${mul:${..max_total_sequence_length}, ${..logprob_batch_size}}
+        sequence_length_round: 64
+
+    sequence_packing:
+        enabled: false
+        train_mb_tokens: ${mul:${..max_total_sequence_length}, ${..train_micro_batch_size}}
+        logprob_mb_tokens: ${mul:${..max_total_sequence_length}, ${..logprob_batch_size}}
+        algorithm: "modified_first_fit_decreasing"
+        sequence_length_round: 64
+
+    max_grad_norm: 1.0
+    make_sequence_length_divisible_by: ${mul:${mul:${.dtensor_cfg.tensor_parallel_size}, ${.dtensor_cfg.context_parallel_size}}, 2}
+    optimizer:
+        name: "torch.optim.AdamW"
+        kwargs:
+            lr: 5.0e-6
+            weight_decay: 0.01
+            betas: [0.9, 0.95]
+            eps: 1e-8
+            foreach: false
+            fused: false
+
+    megatron_cfg:
+        enabled: false
+
+    scheduler:
+        - name: "torch.optim.lr_scheduler.LinearLR"
+          kwargs:
+              start_factor: 0.1
+              end_factor: 1.0
+              total_iters: 20
+        - name: "torch.optim.lr_scheduler.ConstantLR"
+          kwargs:
+              factor: 1.0
+              total_iters: 10000000000
+        - milestones: []
+
+    generation:
+        backend: "vllm"
+        max_new_tokens: 8192
+        temperature: 1.0
+        top_p: 1.0
+        top_k: null
+        stop_token_ids: null
+        stop_strings: null
+        vllm_cfg:
+            async_engine: false
+            precision: ${...precision}
+            kv_cache_dtype: "auto"
+            tensor_parallel_size: 4
+            pipeline_parallel_size: 1
+            expert_parallel_size: 1
+            gpu_memory_utilization: 0.7
+            max_model_len: ${...max_total_sequence_length}
+            enforce_eager: false
+            use_deep_gemm: false
+            num_last_layers_in_bf16: 0
+            num_first_layers_in_bf16: 0
+            distributed_executor_backend: null
+
+        colocated:
+            enabled: true
+            resources:
+                gpus_per_node: null
+                num_nodes: null
+
+# Self-distillation: teacher = same model as student (frozen separate copy)
+teacher:
+    <<: *POLICY_BASE
+    model_name: ${policy.model_name}
+    dtensor_cfg:
+        <<: *DTENSOR_BASE
+        tensor_parallel_size: 4
+        context_parallel_size: 1
+
+data:
+    max_input_seq_length: ${policy.max_total_sequence_length}
+    shuffle: true
+
+    train:
+        dataset_name: simpleqa_opsd
+        processor: simpleqa_opsd
+    default:
+        prompt_file: null
+        system_prompt_file: ${paths.base_dir}/system_prompt.txt
+        env_name: "math"
+
+env:
+    math:
+        num_workers: 8
+
+logger:
+    log_dir: ${paths.log_dir}
+    num_val_samples_to_print: 5
+    wandb_enabled: true
+    tensorboard_enabled: true
+    mlflow_enabled: false
+    swanlab_enabled: false
+    monitor_gpus: true
+    wandb:
+        project: "mix-teachers-opsd"
+        entity: "mathrl-jiarui"
+        name: "opsd-simpleqa-reverse-kl-gt-${policy.model_name}"
+    tensorboard:
+        log_dir: "tb_logs-opsd"
+    gpu_monitoring:
+        collection_interval: 10
+        flush_interval: 10
+
+cluster:
+    gpus_per_node: 4
+    num_nodes: 1
